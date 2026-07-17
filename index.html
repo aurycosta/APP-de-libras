@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comunicador Libras</title>
+    <style>
+        /* Tela inteira, sem barras de rolagem */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            font-family: Arial, sans-serif;
+            overflow: hidden; 
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Texto de instrução no meio da tela */
+        .area-conteudo {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .instrucao {
+            font-size: 22px;
+            color: #555;
+            max-width: 600px;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        /* 
+           O SEGREDO AQUI: 
+           Aumentamos o tamanho do VLibras inteiro pela raiz sem quebrar o 3D.
+        */
+        div[vw] {
+            transform: scale(1.4) !important; /* Deixa o boneco 40% maior */
+            transform-origin: right bottom !important; /* Garante que ele cresça pro lado certo */
+            bottom: 110px !important; /* Coloca ele milimetricamente acima da sua barra */
+            right: 20px !important; 
+        }
+
+        /* BARRA INFERIOR DE CONTROLES */
+        .area-controles {
+            height: 100px;
+            background: white;
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 15px;
+            z-index: 99999;
+            position: fixed; /* Prende a barra lá embaixo */
+            bottom: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input[type="text"] {
+            flex-grow: 1;
+            height: 55px;
+            font-size: 20px;
+            padding: 0 15px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            outline: none;
+        }
+        input[type="text"]:focus {
+            border-color: #007bff;
+        }
+        
+        button {
+            height: 55px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            transition: 0.2s;
+        }
+
+        #btnMicrofone {
+            background-color: #007bff;
+            width: 70px;
+            font-size: 24px;
+        }
+        #btnMicrofone:active, #btnMicrofone.gravando {
+            background-color: #dc3545; 
+        }
+
+        #btnTelaCheia {
+            background-color: #333;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="area-conteudo">
+        <div class="instrucao">
+            <strong>1.</strong> Clique no botão azul à direita para abrir o avatar.<br><br>
+            <strong>2.</strong> Fale no microfone ou digite na barra inferior para traduzir.
+        </div>
+    </div>
+
+    <!-- Widget NATIVO do VLibras (Sem modificações destrutivas) -->
+    <div vw class="enabled">
+        <div vw-access-button class="active"></div>
+        <div vw-plugin-wrapper>
+            <div class="vw-plugin-top-wrapper"></div>
+        </div>
+    </div>
+
+    <!-- Barra Inferior -->
+    <div class="area-controles">
+        <button id="btnTelaCheia" title="Tela Cheia">⛶ Tela Cheia</button>
+        <input type="text" id="campoTexto" placeholder="Fale ou digite aqui..." autocomplete="off">
+        <button id="btnMicrofone" title="Falar">🎤</button>
+    </div>
+
+    <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
+    <script>
+        // Inicia o widget
+        new window.VLibras.Widget('https://vlibras.gov.br/app');
+
+        // Lógica de Tradução
+        const campoTexto = document.getElementById('campoTexto');
+        const btnMicrofone = document.getElementById('btnMicrofone');
+        const btnTelaCheia = document.getElementById('btnTelaCheia');
+
+        function traduzirTexto(texto) {
+            if (!texto.trim()) return;
+            if (window.plugin && typeof window.plugin.translate === 'function') {
+                window.plugin.translate(texto);
+            }
+        }
+
+        campoTexto.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                traduzirTexto(campoTexto.value);
+                campoTexto.value = ''; 
+            }
+        });
+
+        // Lógica de Voz
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'pt-BR';
+            recognition.continuous = false;
+
+            recognition.onstart = () => {
+                btnMicrofone.classList.add('gravando');
+                campoTexto.placeholder = "Ouvindo...";
+            };
+
+            recognition.onresult = (event) => {
+                const fala = event.results[0][0].transcript;
+                campoTexto.value = fala; 
+                traduzirTexto(fala);     
+            };
+
+            recognition.onend = () => {
+                btnMicrofone.classList.remove('gravando');
+                campoTexto.placeholder = "Fale ou digite aqui...";
+            };
+
+            btnMicrofone.addEventListener('click', () => {
+                recognition.start();
+            });
+        } else {
+            btnMicrofone.style.display = 'none';
+            campoTexto.placeholder = "Voz não suportada.";
+        }
+
+        // Lógica de Tela Cheia e Manter Tela Ligada
+        let wakeLock = null;
+        async function manterTelaLigada() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log('Wake Lock erro:', err);
+            }
+        }
+
+        btnTelaCheia.addEventListener('click', async () => {
+            if (!document.fullscreenElement) {
+                await document.documentElement.requestFullscreen();
+                btnTelaCheia.textContent = "Sair Tela Cheia";
+                manterTelaLigada();
+            } else {
+                document.exitFullscreen();
+                btnTelaCheia.textContent = "⛶ Tela Cheia";
+                if (wakeLock !== null) {
+                    wakeLock.release();
+                    wakeLock = null;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
