@@ -38,13 +38,10 @@
             z-index: 1;
         }
 
-        /* 
-           O SEGREDO DO CENTRO: 
-           Desprendemos a raiz do widget do canto e movemos para o meio absoluto da tela.
-        */
+        /* Posicionamento do VLibras no Centro */
         div[vw] {
             position: fixed !important;
-            top: 45% !important; /* Ligeiramente acima do centro para dar espaço para a barra */
+            top: 45% !important; 
             left: 50% !important;
             right: auto !important;
             bottom: auto !important;
@@ -53,7 +50,7 @@
             z-index: 1000 !important;
         }
 
-        /* RESPONSIVIDADE: Aumenta o tamanho do boneco apenas se estiver no PC */
+        /* Responsividade para PC */
         @media (min-width: 768px) {
             div[vw] {
                 transform: translate(-50%, -50%) scale(1.5) !important; 
@@ -67,9 +64,9 @@
             box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
             display: flex;
             align-items: center;
-            justify-content: center; /* Mantém a barra de pesquisa no meio na tela do PC */
+            justify-content: center; 
             padding: 0 20px;
-            gap: 15px;
+            gap: 10px;
             z-index: 99999;
             position: fixed; 
             bottom: 0;
@@ -79,7 +76,7 @@
 
         input[type="text"] {
             flex-grow: 1;
-            max-width: 800px; /* Impede que a barra fique comprida demais no PC */
+            max-width: 800px; 
             height: 55px;
             font-size: 20px;
             padding: 0 15px;
@@ -98,15 +95,25 @@
             cursor: pointer;
             color: white;
             transition: 0.2s;
+            font-size: 24px;
+            width: 65px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #btnMicrofone {
             background-color: #007bff;
-            width: 70px;
-            font-size: 24px;
         }
         #btnMicrofone:active, #btnMicrofone.gravando {
-            background-color: #dc3545; 
+            background-color: #dc3545; /* Vermelho gravando */
+        }
+
+        #btnFalarTexto {
+            background-color: #28a745; /* Verde para o alto-falante */
+        }
+        #btnFalarTexto:active {
+            background-color: #1e7e34;
         }
     </style>
 </head>
@@ -115,7 +122,8 @@
     <div class="area-conteudo">
         <div class="instrucao">
             <strong>1.</strong> Clique no botão azul no centro para abrir o avatar.<br><br>
-            <strong>2.</strong> Fale no microfone ou digite na barra inferior para traduzir.
+            <strong>2.</strong> Fale no <strong>microfone 🎤</strong> para traduzir para Libras.<br>
+            <strong>3.</strong> Digite o texto e clique no <strong>alto-falante 🔊</strong> para ouvir em voz alta.
         </div>
     </div>
 
@@ -129,19 +137,23 @@
 
     <!-- Barra Inferior -->
     <div class="area-controles">
-        <input type="text" id="campoTexto" placeholder="Fale ou digite aqui e aperte Enter..." autocomplete="off">
+        <input type="text" id="campoTexto" placeholder="Fale ou digite aqui..." autocomplete="off">
+        <button id="btnFalarTexto" title="Ler texto em voz alta">🔊</button>
         <button id="btnMicrofone" title="Falar">🎤</button>
     </div>
 
     <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
     <script>
-        // Inicia o widget
+        // Inicia o widget do VLibras
         new window.VLibras.Widget('https://vlibras.gov.br/app');
 
-        // Lógica de Tradução
         const campoTexto = document.getElementById('campoTexto');
         const btnMicrofone = document.getElementById('btnMicrofone');
+        const btnFalarTexto = document.getElementById('btnFalarTexto');
 
+        // ==========================================
+        // 1. LÓGICA DE TRADUÇÃO PARA LIBRAS (Enter)
+        // ==========================================
         function traduzirTexto(texto) {
             if (!texto.trim()) return;
             if (window.plugin && typeof window.plugin.translate === 'function') {
@@ -157,7 +169,29 @@
             }
         });
 
-        // Lógica de Voz
+        // ==========================================
+        // 2. LÓGICA DE TEXTO PARA VOZ (Alto-falante)
+        // ==========================================
+        btnFalarTexto.addEventListener('click', () => {
+            const textoParaFalar = campoTexto.value.trim();
+            
+            if (textoParaFalar !== "") {
+                const sintese = window.speechSynthesis;
+                const fala = new SpeechSynthesisUtterance(textoParaFalar);
+                
+                fala.lang = 'pt-BR'; // Define o idioma português do Brasil
+                fala.rate = 1.0;     // Velocidade normal da fala
+                fala.pitch = 1.0;    // Tom de voz normal
+                
+                sintese.speak(fala); // O dispositivo fala o texto
+            } else {
+                alert("Digite algum texto na barra para ser lido em voz alta.");
+            }
+        });
+
+        // ==========================================
+        // 3. LÓGICA DE VOZ PARA TEXTO (Microfone)
+        // ==========================================
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
@@ -177,7 +211,7 @@
 
             recognition.onend = () => {
                 btnMicrofone.classList.remove('gravando');
-                campoTexto.placeholder = "Fale ou digite aqui e aperte Enter...";
+                campoTexto.placeholder = "Fale ou digite aqui...";
             };
 
             btnMicrofone.addEventListener('click', () => {
